@@ -7,11 +7,12 @@ import PostStats from "@/components/PostStats";
 import WalletConnect from "@/components/WalletConnect";
 import { clearCache } from "@/lib/cache";
 
-interface Post {
+interface PostSummary {
   id: string;
   title: string;
-  description: string;
-  photos: { data: string; name: string }[];
+  preview: string;
+  word_count: number;
+  photo_count: number;
   date: string;
   is_private?: boolean;
   created_at: string;
@@ -22,7 +23,7 @@ interface Post {
 export default function PrivatePage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [search, setSearch] = useState("");

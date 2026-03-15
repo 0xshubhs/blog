@@ -17,25 +17,48 @@ export default function ImageUploader({
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processFile = useCallback(
-    (file: File): Promise<Photo> => {
+  const compressImage = useCallback(
+    (file: File): Promise<string> => {
+      const MAX_WIDTH = 1200;
+      const QUALITY = 0.7;
       return new Promise((resolve, reject) => {
-        if (!file.type.startsWith("image/")) {
-          reject(new Error("Not an image"));
-          return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          resolve({
-            data: reader.result as string,
-            name: file.name || `image-${Date.now()}.png`,
-          });
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          let { width, height } = img;
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { reject(new Error("No canvas context")); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/webp", QUALITY));
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Failed to load")); };
+        img.src = objectUrl;
       });
     },
     []
+  );
+
+  const processFile = useCallback(
+    async (file: File): Promise<Photo> => {
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Not an image");
+      }
+      // Always compress — resize to 1200px max, WebP 70% quality
+      const compressed = await compressImage(file);
+      return {
+        data: compressed,
+        name: (file.name || `image-${Date.now()}`).replace(/\.[^.]+$/, "") + ".webp",
+      };
+    },
+    [compressImage]
   );
 
   const addFiles = useCallback(
