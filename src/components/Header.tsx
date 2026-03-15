@@ -40,13 +40,15 @@ export default function Header() {
   };
 
   return (
-    <header className="border-b border-neutral-200 dark:border-neutral-800">
-      <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-60 transition-opacity">
-          <img src="/m.gif" alt="" className="w-7 h-7 rounded-full" />
-          <span className="text-lg tracking-tight font-medium">0xshubhs-blogs</span>
+    <header>
+      <div className="max-w-3xl mx-auto px-6 pt-8 pb-4 flex flex-col items-center gap-2">
+        <Link href="/" className="flex flex-col items-center gap-2 hover:opacity-70 transition-opacity">
+          <img src="/m.gif" alt="" className="w-14 h-14 rounded-full" />
+          <span className="text-xl tracking-tight font-medium">0xshubhs-blogs</span>
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
+      </div>
+      <div className="max-w-3xl mx-auto px-6 pb-4 border-b border-neutral-200 dark:border-neutral-800">
+        <nav className="flex items-center justify-center gap-6 text-sm">
           <Link
             href="/"
             className={`hover:opacity-60 transition-opacity ${
