@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PostCard from "@/components/PostCard";
 import WalletConnect from "@/components/WalletConnect";
+import { getCached, setCache, clearCache } from "@/lib/cache";
 
 interface Post {
   id: string;
@@ -33,18 +34,35 @@ export default function PrivatePage() {
 
   useEffect(() => {
     if (!authenticated) return;
+
+    const cacheKey = `private_posts_${sort}`;
+    const cached = getCached<Post[]>(cacheKey);
+
+    if (cached) {
+      setPosts(cached);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     fetch(`/api/posts?mode=private&sort=${sort}`)
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setPosts(data);
+        if (Array.isArray(data)) {
+          setPosts(data);
+          setCache(cacheKey, data);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [authenticated, sort]);
 
   const handleDelete = (id: string) => {
-    setPosts(posts.filter((p) => p.id !== id));
+    const updated = posts.filter((p) => p.id !== id);
+    setPosts(updated);
+    // Clear private cache so next visit refetches
+    clearCache("private_posts_desc");
+    clearCache("private_posts_asc");
   };
 
   if (checking) {

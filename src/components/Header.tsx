@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDisconnect } from "wagmi";
+import { clearCache, getCached, setCache } from "@/lib/cache";
 
 export default function Header() {
   const pathname = usePathname();
@@ -12,9 +13,17 @@ export default function Header() {
   const { disconnect } = useDisconnect();
 
   useEffect(() => {
+    const cached = getCached<boolean>("auth_status");
+    if (cached !== null) {
+      setAuthenticated(cached);
+      return;
+    }
     fetch("/api/auth/check")
       .then((r) => r.json())
-      .then((d) => setAuthenticated(d.authenticated))
+      .then((d) => {
+        setAuthenticated(d.authenticated);
+        setCache("auth_status", d.authenticated);
+      })
       .catch(() => {});
   }, []);
 
@@ -24,7 +33,8 @@ export default function Header() {
     // Disconnect wallet from WalletConnect
     disconnect();
     setAuthenticated(false);
-    // Redirect to public page immediately
+    // Clear all caches (posts + auth)
+    clearCache();
     router.push("/");
     router.refresh();
   };

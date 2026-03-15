@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PostCard from "@/components/PostCard";
+import { getCached, setCache } from "@/lib/cache";
 
 interface Post {
   id: string;
@@ -14,16 +15,28 @@ interface Post {
 }
 
 export default function HomePage() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<Post[]>(() => getCached<Post[]>("public_posts") || []);
+  const [loading, setLoading] = useState(!getCached("public_posts"));
   const [sort, setSort] = useState<"desc" | "asc">("desc");
 
   useEffect(() => {
+    const cacheKey = `public_posts_${sort}`;
+    const cached = getCached<Post[]>(cacheKey);
+
+    if (cached) {
+      setPosts(cached);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     fetch(`/api/posts?mode=public&sort=${sort}`)
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setPosts(data);
+        if (Array.isArray(data)) {
+          setPosts(data);
+          setCache(cacheKey, data);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));

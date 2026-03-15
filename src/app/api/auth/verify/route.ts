@@ -44,9 +44,10 @@ export async function POST(request: NextRequest) {
     const token = createSessionToken(recoveredAddress);
 
     const response = NextResponse.json({ success: true });
+    const isProd = process.env.NODE_ENV === "production";
     response.cookies.set(SESSION_COOKIE, token, {
       httpOnly: true,
-      secure: true,
+      secure: isProd,
       sameSite: "strict",
       maxAge: 24 * 60 * 60,
       path: "/",

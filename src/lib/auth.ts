@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 
-const SESSION_COOKIE = "__Host-blog_session";
+const isProd = process.env.NODE_ENV === "production";
+const SESSION_COOKIE = isProd ? "__Host-blog_session" : "blog_session";
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 function getSecret(): string {

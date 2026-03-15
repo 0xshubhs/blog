@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ImageUploader from "@/components/ImageUploader";
 import WalletConnect from "@/components/WalletConnect";
+import { clearCache } from "@/lib/cache";
 
 interface Photo {
   data: string;
@@ -62,6 +63,8 @@ export default function WritePage() {
         return;
       }
 
+      // Clear relevant cache so listing pages fetch fresh data
+      clearCache();
       router.push(isPrivate ? "/private" : "/");
     } catch {
       setError("something went wrong");
