@@ -6,11 +6,12 @@ import SearchBar from "@/components/SearchBar";
 import PostStats from "@/components/PostStats";
 import { getCached, setCache, clearCache } from "@/lib/cache";
 
-interface Post {
+interface PostSummary {
   id: string;
   title: string;
-  description: string;
-  photos: { data: string; name: string }[];
+  preview: string;
+  word_count: number;
+  photo_count: number;
   date: string;
   is_private?: boolean;
   created_at: string;
@@ -19,7 +20,7 @@ interface Post {
 }
 
 export default function HomePage() {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [authenticated, setAuthenticated] = useState(false);

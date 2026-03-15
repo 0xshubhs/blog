@@ -5,22 +5,29 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
-function readingTime(text: string): string {
-  const words = text.split(/\s+/).filter(Boolean).length;
+function readingTime(words: number): string {
   const mins = Math.max(1, Math.round(words / 200));
   return `${mins} min read`;
 }
 
-interface Post {
+// Lightweight post from list API
+interface PostSummary {
   id: string;
   title: string;
-  description: string;
-  photos: { data: string; name: string }[];
+  preview: string;
+  word_count: number;
+  photo_count: number;
   date: string;
   is_private?: boolean;
   created_at: string;
   tags?: string[];
   pinned?: boolean;
+}
+
+// Full post from /api/posts/[id]
+interface FullPost {
+  description: string;
+  photos: { data: string; name: string }[];
 }
 
 export default function PostCard({
@@ -29,15 +36,44 @@ export default function PostCard({
   onPin,
   canDelete,
 }: {
-  post: Post;
+  post: PostSummary;
   onDelete?: (id: string) => void;
   onPin?: (id: string, pinned: boolean) => void;
   canDelete?: boolean;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [fullPost, setFullPost] = useState<FullPost | null>(null);
+  const [loadingFull, setLoadingFull] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [deleting, setDeleting] = useState(false);
+
+  const handleExpand = async () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+
+    setExpanded(true);
+
+    // Lazy-load full content if not already loaded
+    if (!fullPost) {
+      setLoadingFull(true);
+      try {
+        const res = await fetch(`/api/posts/${post.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setFullPost({
+            description: data.description,
+            photos: data.photos || [],
+          });
+        }
+      } catch {
+        // ignore
+      }
+      setLoadingFull(false);
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -71,16 +107,10 @@ export default function PostCard({
     router.push(`/edit/${post.id}`);
   };
 
-  // Strip markdown for preview
-  const plainPreview = post.description
-    .replace(/[#*_~`>\[\]()!-]/g, "")
-    .replace(/\n+/g, " ")
-    .slice(0, 200);
-
   return (
     <article
       className="border border-neutral-200 dark:border-neutral-800 p-6 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
-      onClick={() => setExpanded(!expanded)}
+      onClick={handleExpand}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -89,7 +119,7 @@ export default function PostCard({
               {post.date}
             </time>
             <span className="text-xs text-neutral-400 font-mono">
-              {readingTime(post.description)}
+              {readingTime(post.word_count)}
             </span>
             {post.pinned && (
               <span className="text-xs text-neutral-500">pinned</span>
@@ -103,7 +133,7 @@ export default function PostCard({
           <h2 className="text-base font-medium leading-snug">{post.title}</h2>
           {!expanded && (
             <p className="text-sm text-neutral-500 mt-1 line-clamp-2">
-              {plainPreview}
+              {post.preview}
             </p>
           )}
           {post.tags && post.tags.length > 0 && (
@@ -118,57 +148,61 @@ export default function PostCard({
               ))}
             </div>
           )}
+          {!expanded && post.photo_count > 0 && (
+            <span className="text-xs text-neutral-400 mt-1 inline-block font-mono">
+              {post.photo_count} photo{post.photo_count > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
-        {post.photos?.length > 0 && !expanded && (
-          <div className="w-16 h-16 shrink-0 bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-            <img
-              src={post.photos[0].data}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
       </div>
 
       {expanded && (
         <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-          <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none">
-            <ReactMarkdown>{post.description}</ReactMarkdown>
-          </div>
-
-          {post.photos?.length > 0 && (
-            <div className="mt-4 space-y-3">
-              <div className="border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-                <img
-                  src={post.photos[photoIndex].data}
-                  alt={post.photos[photoIndex].name}
-                  className="w-full max-h-[500px] object-contain bg-neutral-50 dark:bg-neutral-900"
-                />
+          {loadingFull ? (
+            <p className="text-sm text-neutral-400 py-4">loading...</p>
+          ) : fullPost ? (
+            <>
+              <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+                <ReactMarkdown>{fullPost.description}</ReactMarkdown>
               </div>
-              {post.photos.length > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPhotoIndex(Math.max(0, photoIndex - 1))}
-                    disabled={photoIndex === 0}
-                    className="text-xs px-2 py-1 border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  >
-                    prev
-                  </button>
-                  <span className="text-xs text-neutral-500 font-mono">
-                    {photoIndex + 1}/{post.photos.length}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setPhotoIndex(Math.min(post.photos.length - 1, photoIndex + 1))
-                    }
-                    disabled={photoIndex === post.photos.length - 1}
-                    className="text-xs px-2 py-1 border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  >
-                    next
-                  </button>
+
+              {fullPost.photos.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <div className="border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+                    <img
+                      src={fullPost.photos[photoIndex].data}
+                      alt={fullPost.photos[photoIndex].name}
+                      className="w-full max-h-[500px] object-contain bg-neutral-50 dark:bg-neutral-900"
+                    />
+                  </div>
+                  {fullPost.photos.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPhotoIndex(Math.max(0, photoIndex - 1))}
+                        disabled={photoIndex === 0}
+                        className="text-xs px-2 py-1 border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >
+                        prev
+                      </button>
+                      <span className="text-xs text-neutral-500 font-mono">
+                        {photoIndex + 1}/{fullPost.photos.length}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setPhotoIndex(Math.min(fullPost.photos.length - 1, photoIndex + 1))
+                        }
+                        disabled={photoIndex === fullPost.photos.length - 1}
+                        className="text-xs px-2 py-1 border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >
+                        next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
+          ) : (
+            <p className="text-sm text-neutral-400 py-4">failed to load</p>
           )}
 
           <div className="mt-4 flex items-center gap-2">
