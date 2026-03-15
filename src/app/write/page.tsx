@@ -113,10 +113,13 @@ export default function WritePage() {
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="write something..."
+            placeholder="write something... (supports markdown)"
             rows={8}
-            className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 px-4 py-3 text-sm leading-relaxed focus:outline-none focus:border-black dark:focus:border-white transition-colors placeholder:text-neutral-400 resize-y"
+            className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 px-4 py-3 text-sm leading-relaxed focus:outline-none focus:border-black dark:focus:border-white transition-colors placeholder:text-neutral-400 resize-y font-mono"
           />
+          <p className="mt-1.5 text-xs text-neutral-400">
+            **bold** &nbsp; *italic* &nbsp; # heading &nbsp; - list &nbsp; `code` &nbsp; [link](url) &nbsp; &gt; quote
+          </p>
         </div>
 
         <ImageUploader photos={photos} setPhotos={setPhotos} />

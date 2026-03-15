@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface Post {
   id: string;
@@ -38,6 +39,12 @@ export default function PostCard({
     setDeleting(false);
   };
 
+  // Strip markdown for preview
+  const plainPreview = post.description
+    .replace(/[#*_~`>\[\]()!-]/g, "")
+    .replace(/\n+/g, " ")
+    .slice(0, 200);
+
   return (
     <article
       className="border border-neutral-200 dark:border-neutral-800 p-6 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
@@ -58,7 +65,7 @@ export default function PostCard({
           <h2 className="text-base font-medium leading-snug">{post.title}</h2>
           {!expanded && (
             <p className="text-sm text-neutral-500 mt-1 line-clamp-2">
-              {post.description}
+              {plainPreview}
             </p>
           )}
         </div>
@@ -75,9 +82,9 @@ export default function PostCard({
 
       {expanded && (
         <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-            {post.description}
-          </p>
+          <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+            <ReactMarkdown>{post.description}</ReactMarkdown>
+          </div>
 
           {post.photos?.length > 0 && (
             <div className="mt-4 space-y-3">

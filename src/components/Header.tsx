@@ -42,8 +42,9 @@ export default function Header() {
   return (
     <header className="border-b border-neutral-200 dark:border-neutral-800">
       <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
-        <Link href="/" className="text-lg tracking-tight font-medium hover:opacity-60 transition-opacity">
-          blog
+        <Link href="/" className="flex items-center gap-2.5 hover:opacity-60 transition-opacity">
+          <img src="/m.gif" alt="" className="w-7 h-7 rounded-full" />
+          <span className="text-lg tracking-tight font-medium">0xshubhs-blogs</span>
         </Link>
         <nav className="flex items-center gap-6 text-sm">
           <Link
