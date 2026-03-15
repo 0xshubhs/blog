@@ -296,7 +296,6 @@ contract BlogRegistryTest is Test {
 
     // ─── Fuzz Tests ──────────────────────────────────────────────────────
 
-    // Fuzz test: any valid title+CID should create a post
     function testFuzz_CreatePost(string calldata title, string calldata cid) public {
         vm.assume(bytes(title).length > 0 && bytes(title).length < 500);
         vm.assume(bytes(cid).length > 0 && bytes(cid).length < 200);
@@ -308,7 +307,6 @@ contract BlogRegistryTest is Test {
         assertEq(c, cid);
     }
 
-    // Fuzz test: random tag counts (0-10 should work, 11+ should revert)
     function testFuzz_TagLimit(uint8 tagCount) public {
         tagCount = uint8(bound(tagCount, 0, 20));
         string[] memory tags = new string[](tagCount);
@@ -321,9 +319,7 @@ contract BlogRegistryTest is Test {
         blog.createPost("Title", "QmCID", false, tags);
     }
 
-    // Fuzz test: pagination bounds
     function testFuzz_GetPostsPagination(uint256 offset, uint256 limit) public {
-        // Create 5 posts first
         string[] memory tags = new string[](0);
         for (uint256 i = 0; i < 5; i++) {
             blog.createPost("Post", "QmCID", false, tags);
@@ -339,9 +335,8 @@ contract BlogRegistryTest is Test {
         }
     }
 
-    // Fuzz test: random address cannot create posts
     function testFuzz_UnauthorizedCreate(address caller) public {
-        vm.assume(caller != address(this));  // owner
+        vm.assume(caller != address(this));
         string[] memory tags = new string[](0);
         vm.prank(caller);
         vm.expectRevert(BlogRegistry.NotAuthorized.selector);
@@ -350,7 +345,6 @@ contract BlogRegistryTest is Test {
 
     // ─── Edge Case Tests ─────────────────────────────────────────────────
 
-    // Edge: create post with exactly 10 tags (max allowed)
     function test_CreatePostMaxTags() public {
         string[] memory tags = new string[](10);
         for (uint256 i = 0; i < 10; i++) tags[i] = "tag";
@@ -359,15 +353,13 @@ contract BlogRegistryTest is Test {
         assertEq(t.length, 10);
     }
 
-    // Edge: get post at boundary
     function test_RevertGetPostAtLength() public {
         string[] memory tags = new string[](0);
         blog.createPost("A", "QmA", false, tags);
         vm.expectRevert(BlogRegistry.PostNotFound.selector);
-        blog.getPost(1);  // only index 0 exists
+        blog.getPost(1);
     }
 
-    // Edge: edit preserves createdAt but updates updatedAt
     function test_EditPreservesCreatedAt() public {
         string[] memory tags = new string[](0);
         blog.createPost("A", "QmA", false, tags);
@@ -379,7 +371,6 @@ contract BlogRegistryTest is Test {
         assertGt(updated2, created2);
     }
 
-    // Edge: writer removed then re-added
     function test_ReaddWriter() public {
         blog.addWriter(writer);
         blog.removeWriter(writer);
@@ -390,18 +381,14 @@ contract BlogRegistryTest is Test {
         blog.createPost("OK", "QmOK", false, tags);
     }
 
-    // Edge: transfer ownership — old owner loses owner role but keeps writer
     function test_TransferOwnershipOldOwnerStillWriter() public {
         blog.transferOwnership(writer);
-        // old owner is no longer owner
         assertEq(blog.owner(), writer);
-        // but old owner should still be a writer (they were added in constructor)
         assertTrue(blog.writers(address(this)));
     }
 
     // ─── Security Tests ──────────────────────────────────────────────────
 
-    // Security: non-owner cannot transfer ownership
     function testFuzz_OnlyOwnerTransfers(address caller) public {
         vm.assume(caller != address(this));
         vm.prank(caller);
@@ -409,7 +396,6 @@ contract BlogRegistryTest is Test {
         blog.transferOwnership(caller);
     }
 
-    // Security: non-owner cannot add/remove writers
     function testFuzz_OnlyOwnerManagesWriters(address caller) public {
         vm.assume(caller != address(this));
         vm.prank(caller);
