@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PostCard from "@/components/PostCard";
-import { getCached, setCache } from "@/lib/cache";
+import { getCached, setCache, clearCache } from "@/lib/cache";
 
 interface Post {
   id: string;
@@ -18,6 +18,22 @@ export default function HomePage() {
   const [posts, setPosts] = useState<Post[]>(() => getCached<Post[]>("public_posts") || []);
   const [loading, setLoading] = useState(!getCached("public_posts"));
   const [sort, setSort] = useState<"desc" | "asc">("desc");
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const cached = getCached<boolean>("auth_status");
+    if (cached !== null) {
+      setAuthenticated(cached);
+    } else {
+      fetch("/api/auth/check")
+        .then((r) => r.json())
+        .then((d) => {
+          setAuthenticated(d.authenticated);
+          setCache("auth_status", d.authenticated);
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const cacheKey = `public_posts_${sort}`;
@@ -42,6 +58,12 @@ export default function HomePage() {
       .catch(() => setLoading(false));
   }, [sort]);
 
+  const handleDelete = (id: string) => {
+    setPosts(posts.filter((p) => p.id !== id));
+    clearCache("public_posts_desc");
+    clearCache("public_posts_asc");
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -63,7 +85,12 @@ export default function HomePage() {
       ) : (
         <div className="space-y-3">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard
+              key={post.id}
+              post={post}
+              canDelete={authenticated}
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       )}
