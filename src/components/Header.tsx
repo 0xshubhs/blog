@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDisconnect } from "wagmi";
 import { clearCache, getCached, setCache } from "@/lib/cache";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Header() {
   const pathname = usePathname();
@@ -28,16 +29,25 @@ export default function Header() {
   }, []);
 
   const handleDisconnect = async () => {
-    // Clear server session
     await fetch("/api/auth/logout", { method: "POST" });
-    // Disconnect wallet from WalletConnect
     disconnect();
     setAuthenticated(false);
-    // Clear all caches (posts + auth)
     clearCache();
     router.push("/");
     router.refresh();
   };
+
+  // Keyboard shortcut: Ctrl+Shift+L to disconnect
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "L" && authenticated) {
+        e.preventDefault();
+        handleDisconnect();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
 
   return (
     <header>
@@ -73,10 +83,12 @@ export default function Header() {
           >
             write
           </Link>
+          <ThemeToggle />
           {authenticated && (
             <button
               onClick={handleDisconnect}
               className="px-2.5 py-1 text-xs border border-neutral-300 dark:border-neutral-700 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors"
+              title="Ctrl+Shift+L"
             >
               disconnect
             </button>

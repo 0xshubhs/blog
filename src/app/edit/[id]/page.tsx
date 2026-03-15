@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import ImageUploader from "@/components/ImageUploader";
 import MarkdownToolbar from "@/components/MarkdownToolbar";
 import TagInput from "@/components/TagInput";
-import WalletConnect from "@/components/WalletConnect";
 import { clearCache } from "@/lib/cache";
 
 interface Photo {
@@ -13,29 +12,40 @@ interface Photo {
   name: string;
 }
 
-export default function WritePage() {
+export default function EditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [checking, setChecking] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/check")
-      .then((r) => r.json())
-      .then((d) => {
-        setAuthenticated(d.authenticated);
-        setChecking(false);
+    fetch(`/api/posts/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Not found");
+        return r.json();
       })
-      .catch(() => setChecking(false));
-  }, []);
+      .then((post) => {
+        setTitle(post.title);
+        setDescription(post.description);
+        setDate(post.date);
+        setPhotos(post.photos || []);
+        setTags(post.tags || []);
+        setIsPrivate(post.is_private || false);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("post not found");
+        setLoading(false);
+      });
+  }, [id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,8 +58,8 @@ export default function WritePage() {
     setError("");
 
     try {
-      const res = await fetch("/api/posts", {
-        method: "POST",
+      const res = await fetch(`/api/posts/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
@@ -63,12 +73,11 @@ export default function WritePage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "failed to create post");
+        setError(data.error || "failed to update post");
         setSubmitting(false);
         return;
       }
 
-      // Clear relevant cache so listing pages fetch fresh data
       clearCache();
       router.push(isPrivate ? "/private" : "/");
     } catch {
@@ -77,42 +86,33 @@ export default function WritePage() {
     }
   };
 
-  if (checking) {
-    return <p className="text-sm text-neutral-400 py-20 text-center">checking auth...</p>;
+  if (loading) {
+    return <p className="text-sm text-neutral-400 py-20 text-center">loading...</p>;
   }
 
-  if (!authenticated) {
-    return (
-      <div>
-        <h1 className="text-sm text-neutral-500 mb-6">new post</h1>
-        <WalletConnect onAuthenticated={() => setAuthenticated(true)} />
-      </div>
-    );
+  if (error && !title) {
+    return <p className="text-sm text-red-500 py-20 text-center">{error}</p>;
   }
 
   return (
     <div>
-      <h1 className="text-sm text-neutral-500 mb-6">new post</h1>
+      <h1 className="text-sm text-neutral-500 mb-6">edit post</h1>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-black dark:focus:border-white transition-colors"
-          />
-        </div>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-black dark:focus:border-white transition-colors"
+        />
 
-        <div>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="title"
-            className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm focus:outline-none focus:border-black dark:focus:border-white transition-colors placeholder:text-neutral-400"
-          />
-        </div>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="title"
+          className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 px-4 py-2.5 text-sm focus:outline-none focus:border-black dark:focus:border-white transition-colors placeholder:text-neutral-400"
+        />
 
         <div>
           <MarkdownToolbar textareaRef={textareaRef} onUpdate={setDescription} />
@@ -161,7 +161,7 @@ export default function WritePage() {
           disabled={submitting}
           className="w-full py-2.5 text-sm border border-black dark:border-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-50"
         >
-          {submitting ? "publishing..." : "publish"}
+          {submitting ? "saving..." : "save changes"}
         </button>
       </form>
     </div>

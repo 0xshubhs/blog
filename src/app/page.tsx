@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import PostCard from "@/components/PostCard";
+import SearchBar from "@/components/SearchBar";
+import PostStats from "@/components/PostStats";
 import { getCached, setCache, clearCache } from "@/lib/cache";
 
 interface Post {
@@ -12,13 +14,19 @@ interface Post {
   date: string;
   is_private?: boolean;
   created_at: string;
+  tags?: string[];
+  pinned?: boolean;
 }
 
 export default function HomePage() {
-  const [posts, setPosts] = useState<Post[]>(() => getCached<Post[]>("public_posts") || []);
-  const [loading, setLoading] = useState(!getCached("public_posts"));
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [authenticated, setAuthenticated] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const cached = getCached<boolean>("auth_status");
@@ -35,52 +43,104 @@ export default function HomePage() {
     }
   }, []);
 
-  useEffect(() => {
-    const cacheKey = `public_posts_${sort}`;
-    const cached = getCached<Post[]>(cacheKey);
+  const fetchPosts = useCallback(
+    async (p: number, append: boolean) => {
+      if (p === 1) setLoading(true);
+      else setLoadingMore(true);
 
-    if (cached) {
-      setPosts(cached);
-      setLoading(false);
-      return;
-    }
+      const params = new URLSearchParams({
+        mode: "public",
+        sort,
+        page: String(p),
+        limit: "20",
+      });
+      if (search) params.set("search", search);
 
-    setLoading(true);
-    fetch(`/api/posts?mode=public&sort=${sort}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setPosts(data);
-          setCache(cacheKey, data);
+      try {
+        const res = await fetch(`/api/posts?${params}`);
+        const data = await res.json();
+        if (data.posts) {
+          setPosts((prev) => (append ? [...prev, ...data.posts] : data.posts));
+          setTotal(data.total);
         }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [sort]);
+      } catch {
+        // ignore
+      }
+      setLoading(false);
+      setLoadingMore(false);
+    },
+    [sort, search]
+  );
+
+  useEffect(() => {
+    setPage(1);
+    fetchPosts(1, false);
+  }, [fetchPosts]);
+
+  const loadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchPosts(nextPage, true);
+  };
 
   const handleDelete = (id: string) => {
     setPosts(posts.filter((p) => p.id !== id));
-    clearCache("public_posts_desc");
-    clearCache("public_posts_asc");
+    setTotal((t) => t - 1);
+    clearCache();
   };
+
+  const handlePin = (id: string, pinned: boolean) => {
+    setPosts(posts.map((p) => (p.id === id ? { ...p, pinned } : p)));
+    clearCache();
+  };
+
+  const handleExport = async () => {
+    const res = await fetch("/api/posts/export");
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `blog-export-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const hasMore = posts.length < total;
 
   return (
     <div>
+      <div className="mb-4">
+        <SearchBar onSearch={setSearch} />
+      </div>
+
+      <PostStats posts={posts} />
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-sm text-neutral-500">public posts</h1>
-        <button
-          onClick={() => setSort(sort === "desc" ? "asc" : "desc")}
-          className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors font-mono"
-        >
-          {sort === "desc" ? "newest first" : "oldest first"}
-        </button>
+        <div className="flex items-center gap-3">
+          {authenticated && (
+            <button
+              onClick={handleExport}
+              className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors font-mono"
+            >
+              export
+            </button>
+          )}
+          <button
+            onClick={() => setSort(sort === "desc" ? "asc" : "desc")}
+            className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors font-mono"
+          >
+            {sort === "desc" ? "newest first" : "oldest first"}
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <p className="text-sm text-neutral-400 py-20 text-center">loading...</p>
       ) : posts.length === 0 ? (
         <p className="text-sm text-neutral-400 py-20 text-center">
-          no posts yet
+          {search ? "no matching posts" : "no posts yet"}
         </p>
       ) : (
         <div className="space-y-3">
@@ -90,8 +150,19 @@ export default function HomePage() {
               post={post}
               canDelete={authenticated}
               onDelete={handleDelete}
+              onPin={handlePin}
             />
           ))}
+
+          {hasMore && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full py-2.5 text-sm text-neutral-500 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors font-mono"
+            >
+              {loadingMore ? "loading..." : `load more (${posts.length}/${total})`}
+            </button>
+          )}
         </div>
       )}
     </div>
