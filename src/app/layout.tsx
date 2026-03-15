@@ -96,6 +96,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/m.gif" />
         <meta name="theme-color" content="#0a0a0a" />
         <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');document.documentElement.setAttribute('data-theme','dark')}if(t==='light'){document.documentElement.setAttribute('data-theme','light')}}catch(e){}})()`,
+          }}
+        />
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({

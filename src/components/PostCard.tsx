@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 
 interface Post {
@@ -11,17 +12,22 @@ interface Post {
   date: string;
   is_private?: boolean;
   created_at: string;
+  tags?: string[];
+  pinned?: boolean;
 }
 
 export default function PostCard({
   post,
   onDelete,
+  onPin,
   canDelete,
 }: {
   post: Post;
   onDelete?: (id: string) => void;
+  onPin?: (id: string, pinned: boolean) => void;
   canDelete?: boolean;
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [deleting, setDeleting] = useState(false);
@@ -37,6 +43,25 @@ export default function PostCard({
       alert("Failed to delete");
     }
     setDeleting(false);
+  };
+
+  const handlePin = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: !post.pinned }),
+      });
+      if (res.ok && onPin) onPin(post.id, !post.pinned);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    router.push(`/edit/${post.id}`);
   };
 
   // Strip markdown for preview
@@ -56,6 +81,9 @@ export default function PostCard({
             <time className="text-xs text-neutral-500 font-mono tabular-nums shrink-0">
               {post.date}
             </time>
+            {post.pinned && (
+              <span className="text-xs text-neutral-500">pinned</span>
+            )}
             {post.is_private && (
               <span className="text-xs px-1.5 py-0.5 border border-neutral-300 dark:border-neutral-700 text-neutral-500">
                 private
@@ -67,6 +95,18 @@ export default function PostCard({
             <p className="text-sm text-neutral-500 mt-1 line-clamp-2">
               {plainPreview}
             </p>
+          )}
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {post.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-1.5 py-0.5 border border-neutral-200 dark:border-neutral-800 text-neutral-400"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
         </div>
         {post.photos?.length > 0 && !expanded && (
@@ -122,13 +162,27 @@ export default function PostCard({
           )}
 
           {canDelete && (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="mt-4 text-xs px-3 py-1.5 border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 transition-colors"
-            >
-              {deleting ? "deleting..." : "delete"}
-            </button>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                onClick={handleEdit}
+                className="text-xs px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                edit
+              </button>
+              <button
+                onClick={handlePin}
+                className="text-xs px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                {post.pinned ? "unpin" : "pin"}
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs px-3 py-1.5 border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 transition-colors"
+              >
+                {deleting ? "deleting..." : "delete"}
+              </button>
+            </div>
           )}
         </div>
       )}

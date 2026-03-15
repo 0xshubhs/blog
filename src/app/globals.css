@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #0a0a0a;
@@ -13,11 +15,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
@@ -31,11 +31,9 @@ body {
   color: #fff;
 }
 
-@media (prefers-color-scheme: dark) {
-  ::selection {
-    background: #fff;
-    color: #000;
-  }
+.dark ::selection {
+  background: #fff;
+  color: #000;
 }
 
 * {
@@ -43,8 +41,6 @@ body {
   scrollbar-color: #d4d4d4 transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  * {
-    scrollbar-color: #404040 transparent;
-  }
+.dark * {
+  scrollbar-color: #404040 transparent;
 }
