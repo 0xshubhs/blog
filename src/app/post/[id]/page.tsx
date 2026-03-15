@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase";
 import { decrypt } from "@/lib/encryption";
 import { isAuthenticated } from "@/lib/auth";
@@ -8,6 +9,19 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://0xshubhs.com";
 const siteName = "0xshubhs-blogs";
 
+export const revalidate = 60;
+
+const getPost = cache(async (id: string) => {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("posts")
+    .select("id, title, description, photos, date, created_at, is_private, tags, pinned")
+    .eq("id", id)
+    .eq("is_private", false)
+    .single();
+  return data;
+});
+
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -17,14 +31,9 @@ export async function generateMetadata({ params }: Props) {
 
   if (!UUID_REGEX.test(id)) return { title: "Not Found" };
 
-  const supabase = createClient();
-  const { data } = await supabase
-    .from("posts")
-    .select("title, description, date, is_private")
-    .eq("id", id)
-    .single();
+  const data = await getPost(id);
 
-  if (!data || data.is_private) {
+  if (!data) {
     return { title: "Not Found" };
   }
 
@@ -57,10 +66,19 @@ export default async function PostPage({ params }: Props) {
 
   if (!UUID_REGEX.test(id)) notFound();
 
+  // Try the cached public fetch first (deduplicates with generateMetadata).
+  const publicData = await getPost(id);
+
+  if (publicData) {
+    // Public post — no encrypted_data on this path.
+    return <PostPageClient post={publicData} />;
+  }
+
+  // Post not found as public — check if it exists as a private post.
   const supabase = createClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*")
+    .select("id, encrypted_data, date, created_at, is_private, tags, pinned")
     .eq("id", id)
     .single();
 
@@ -74,11 +92,15 @@ export default async function PostPage({ params }: Props) {
       try {
         const decrypted = JSON.parse(decrypt(data.encrypted_data));
         const post = {
-          ...data,
+          id: data.id,
+          date: data.date,
+          created_at: data.created_at,
+          is_private: data.is_private,
+          tags: data.tags,
+          pinned: data.pinned,
           title: decrypted.title,
           description: decrypted.description,
           photos: decrypted.photos,
-          encrypted_data: undefined,
         };
         return <PostPageClient post={post} />;
       } catch {
@@ -87,5 +109,6 @@ export default async function PostPage({ params }: Props) {
     }
   }
 
-  return <PostPageClient post={{ ...data, encrypted_data: undefined }} />;
+  // If we reach here, the post is neither public nor a valid private post
+  notFound();
 }

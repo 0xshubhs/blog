@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
-import ImageUploader from "@/components/ImageUploader";
-import MarkdownToolbar from "@/components/MarkdownToolbar";
+import dynamic from "next/dynamic";
 import TagInput from "@/components/TagInput";
 import { clearCache } from "@/lib/cache";
+
+const ImageUploader = dynamic(() => import("@/components/ImageUploader"), { ssr: false });
+const MarkdownToolbar = dynamic(() => import("@/components/MarkdownToolbar"), { ssr: false });
 
 interface Photo {
   data: string;

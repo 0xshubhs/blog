@@ -10,12 +10,12 @@ contract BlogRegistry {
     struct Post {
         string title;
         string contentCID; // IPFS CID pointing to full content (description + photos)
+        string[] tags;
+        uint48 createdAt;
+        uint48 updatedAt;
         bool isPrivate; // if true, contentCID points to encrypted blob
         bool pinned;
         bool deleted;
-        uint256 createdAt;
-        uint256 updatedAt;
-        string[] tags;
     }
 
     // ─── State ───────────────────────────────────────────────────────────
@@ -97,11 +97,12 @@ contract BlogRegistry {
         p.isPrivate = isPrivate;
         p.pinned = false;
         p.deleted = false;
-        p.createdAt = block.timestamp;
-        p.updatedAt = block.timestamp;
+        p.createdAt = uint48(block.timestamp);
+        p.updatedAt = uint48(block.timestamp);
 
-        for (uint256 i = 0; i < tags.length; i++) {
+        for (uint256 i = 0; i < tags.length;) {
             p.tags.push(tags[i]);
+            unchecked { ++i; }
         }
 
         emit PostCreated(id, msg.sender, title, contentCID, isPrivate);
@@ -129,12 +130,13 @@ contract BlogRegistry {
         p.title = title;
         p.contentCID = contentCID;
         p.isPrivate = isPrivate;
-        p.updatedAt = block.timestamp;
+        p.updatedAt = uint48(block.timestamp);
 
         // Replace tags
         delete p.tags;
-        for (uint256 i = 0; i < tags.length; i++) {
+        for (uint256 i = 0; i < tags.length;) {
             p.tags.push(tags[i]);
+            unchecked { ++i; }
         }
 
         emit PostUpdated(id, title, contentCID, isPrivate);
@@ -150,8 +152,10 @@ contract BlogRegistry {
     /// @notice Toggle pin status of a post
     /// @param id Post ID to pin/unpin
     function togglePin(uint256 id) external onlyWriter validPost(id) {
-        posts[id].pinned = !posts[id].pinned;
-        emit PostPinned(id, posts[id].pinned);
+        Post storage p = posts[id];
+        bool newPinned = !p.pinned;
+        p.pinned = newPinned;
+        emit PostPinned(id, newPinned);
     }
 
     // ─── Writer Management ───────────────────────────────────────────────
@@ -200,8 +204,8 @@ contract BlogRegistry {
             bool isPrivate,
             bool pinned,
             bool deleted,
-            uint256 createdAt,
-            uint256 updatedAt,
+            uint48 createdAt,
+            uint48 updatedAt,
             string[] memory tags
         )
     {
@@ -229,12 +233,12 @@ contract BlogRegistry {
             bool[] memory isPrivateFlags,
             bool[] memory pinnedFlags,
             bool[] memory deletedFlags,
-            uint256[] memory createdAts
+            uint48[] memory createdAts
         )
     {
         uint256 total = posts.length;
         if (offset >= total) {
-            return (new uint256[](0), new string[](0), new bool[](0), new bool[](0), new bool[](0), new uint256[](0));
+            return (new uint256[](0), new string[](0), new bool[](0), new bool[](0), new bool[](0), new uint48[](0));
         }
 
         uint256 end = offset + limit;
@@ -246,9 +250,9 @@ contract BlogRegistry {
         isPrivateFlags = new bool[](count);
         pinnedFlags = new bool[](count);
         deletedFlags = new bool[](count);
-        createdAts = new uint256[](count);
+        createdAts = new uint48[](count);
 
-        for (uint256 i = 0; i < count; i++) {
+        for (uint256 i = 0; i < count;) {
             uint256 idx = offset + i;
             Post storage p = posts[idx];
             ids[i] = idx;
@@ -257,6 +261,7 @@ contract BlogRegistry {
             pinnedFlags[i] = p.pinned;
             deletedFlags[i] = p.deleted;
             createdAts[i] = p.createdAt;
+            unchecked { ++i; }
         }
     }
 }

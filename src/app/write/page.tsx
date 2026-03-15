@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import ImageUploader from "@/components/ImageUploader";
-import MarkdownToolbar from "@/components/MarkdownToolbar";
+import dynamic from "next/dynamic";
 import TagInput from "@/components/TagInput";
-import WalletConnect from "@/components/WalletConnect";
-import { clearCache } from "@/lib/cache";
+import { getCached, setCache, clearCache } from "@/lib/cache";
+
+const ImageUploader = dynamic(() => import("@/components/ImageUploader"), { ssr: false });
+const MarkdownToolbar = dynamic(() => import("@/components/MarkdownToolbar"), { ssr: false });
+const WalletConnect = dynamic(() => import("@/components/WalletConnect"), { ssr: false });
 
 interface Photo {
   data: string;
@@ -62,10 +64,17 @@ export default function WritePage() {
   }, [title, description, date, tags, isPrivate]);
 
   useEffect(() => {
+    const cached = getCached<boolean>("auth_status");
+    if (cached !== null) {
+      setAuthenticated(cached);
+      setChecking(false);
+      return;
+    }
     fetch("/api/auth/check")
       .then((r) => r.json())
       .then((d) => {
         setAuthenticated(d.authenticated);
+        setCache("auth_status", d.authenticated);
         setChecking(false);
       })
       .catch(() => setChecking(false));

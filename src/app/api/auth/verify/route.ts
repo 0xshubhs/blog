@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ethers } from "ethers";
+import { recoverMessageAddress } from "viem";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/auth";
 
 const MAX_MESSAGE_AGE_MS = 5 * 60 * 1000; // 5 minutes
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Recover the wallet address from the signature
-    const recoveredAddress = ethers.verifyMessage(message, signature);
+    const recoveredAddress = await recoverMessageAddress({ message, signature: signature as `0x${string}` });
     const allowedAddress = process.env.WALLET_ADDRESS;
 
     if (!allowedAddress) {

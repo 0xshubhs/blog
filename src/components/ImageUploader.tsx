@@ -151,6 +151,8 @@ export default function ImageUploader({
                 src={photo.data}
                 alt={photo.name}
                 className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               <button
                 type="button"

@@ -1,34 +1,40 @@
 "use client";
 
+import { memo, useMemo } from "react";
+
 interface PostSummary {
   word_count: number;
   date: string;
 }
 
-export default function PostStats({ posts }: { posts: PostSummary[] }) {
+function PostStats({ posts }: { posts: PostSummary[] }) {
   if (posts.length === 0) return null;
 
-  const totalWords = posts.reduce((sum, p) => sum + (p.word_count || 0), 0);
+  const { totalWords, streak } = useMemo(() => {
+    const totalWords = posts.reduce((sum, p) => sum + (p.word_count || 0), 0);
 
-  // Calculate streak (consecutive days with posts, counting backwards from most recent)
-  const dates = [...new Set(posts.map((p) => p.date))].sort().reverse();
-  let streak = 0;
-  if (dates.length > 0) {
-    const today = new Date().toISOString().split("T")[0];
-    const mostRecent = dates[0];
-    const diffMs = new Date(today).getTime() - new Date(mostRecent).getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffDays <= 1) {
-      streak = 1;
-      for (let i = 1; i < dates.length; i++) {
-        const prev = new Date(dates[i - 1]);
-        const curr = new Date(dates[i]);
-        const gap = (prev.getTime() - curr.getTime()) / 86400000;
-        if (gap <= 1) streak++;
-        else break;
+    // Calculate streak (consecutive days with posts, counting backwards from most recent)
+    const dates = [...new Set(posts.map((p) => p.date))].sort().reverse();
+    let streak = 0;
+    if (dates.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+      const mostRecent = dates[0];
+      const diffMs = new Date(today).getTime() - new Date(mostRecent).getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      if (diffDays <= 1) {
+        streak = 1;
+        for (let i = 1; i < dates.length; i++) {
+          const prev = new Date(dates[i - 1]);
+          const curr = new Date(dates[i]);
+          const gap = (prev.getTime() - curr.getTime()) / 86400000;
+          if (gap <= 1) streak++;
+          else break;
+        }
       }
     }
-  }
+
+    return { totalWords, streak };
+  }, [posts]);
 
   return (
     <div className="flex items-center gap-4 text-xs text-neutral-400 font-mono mb-4">
@@ -38,3 +44,5 @@ export default function PostStats({ posts }: { posts: PostSummary[] }) {
     </div>
   );
 }
+
+export default memo(PostStats);

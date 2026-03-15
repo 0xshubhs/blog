@@ -5,12 +5,16 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-export function getCached<T>(key: string): T | null {
+export function getCached<T>(key: string, maxAge: number = 300000): T | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
     const entry: CacheEntry<T> = JSON.parse(raw);
+    if (Date.now() - entry.timestamp > maxAge) {
+      sessionStorage.removeItem(CACHE_PREFIX + key);
+      return null;
+    }
     return entry.data;
   } catch {
     return null;

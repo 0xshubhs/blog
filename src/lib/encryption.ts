@@ -2,10 +2,13 @@ import crypto from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 
+let _cachedKey: Buffer | null = null;
 function getKey(): Buffer {
+  if (_cachedKey) return _cachedKey;
   const key = process.env.ENCRYPTION_KEY;
   if (!key) throw new Error("ENCRYPTION_KEY env var is required");
-  return crypto.createHash("sha256").update(key).digest();
+  _cachedKey = crypto.createHash("sha256").update(key).digest();
+  return _cachedKey;
 }
 
 export function encrypt(plaintext: string): string {

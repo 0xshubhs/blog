@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
+import dynamic from "next/dynamic";
+const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
 
 interface Post {
   id: string;
@@ -75,6 +76,8 @@ export default function PostPageClient({ post }: { post: Post }) {
                 src={post.photos[photoIndex].data}
                 alt={post.photos[photoIndex].name}
                 className="w-full max-h-[600px] object-contain bg-neutral-50 dark:bg-neutral-900"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             {post.photos.length > 1 && (

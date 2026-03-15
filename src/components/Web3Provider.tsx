@@ -3,7 +3,7 @@
 import { WagmiProvider } from "wagmi";
 import { mainnet } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useState, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { defaultWagmiConfig } from "@web3modal/wagmi/react/config";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "placeholder";
@@ -24,10 +24,8 @@ const config = defaultWagmiConfig({
   ssr: true,
 });
 
-const queryClient = new QueryClient();
-
 export default function Web3Provider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const [queryClient] = useState(() => new QueryClient());
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -35,12 +33,9 @@ export default function Web3Provider({ children }: { children: ReactNode }) {
       initialized.current = true;
       import("@web3modal/wagmi/react").then(({ createWeb3Modal }) => {
         createWeb3Modal({ wagmiConfig: config, projectId });
-        setReady(true);
       });
     }
   }, []);
-
-  if (!ready) return null;
 
   return (
     <WagmiProvider config={config}>

@@ -19,14 +19,20 @@ interface PostSummary {
   pinned?: boolean;
 }
 
+function getInitialPublicData() {
+  const cached = getCached<{ posts: PostSummary[]; total: number }>("public_posts");
+  return { posts: cached?.posts || [], total: cached?.total || 0, hasCached: cached !== null };
+}
+
 export default function HomePage() {
-  const [posts, setPosts] = useState<PostSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initial] = useState(getInitialPublicData);
+  const [posts, setPosts] = useState<PostSummary[]>(initial.posts);
+  const [loading, setLoading] = useState(!initial.hasCached);
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [authenticated, setAuthenticated] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState(initial.total);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
@@ -46,8 +52,19 @@ export default function HomePage() {
 
   const fetchPosts = useCallback(
     async (p: number, append: boolean) => {
-      if (p === 1) setLoading(true);
-      else setLoadingMore(true);
+      if (p === 1 && !search) {
+        const cached = getCached<{ posts: PostSummary[]; total: number }>("public_posts");
+        if (cached) {
+          setPosts(cached.posts);
+          setTotal(cached.total);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const hasCached = getCached<{ posts: PostSummary[]; total: number }>("public_posts") !== null;
+      if (p === 1 && !hasCached) setLoading(true);
+      else if (p > 1) setLoadingMore(true);
 
       const params = new URLSearchParams({
         mode: "public",
@@ -61,8 +78,11 @@ export default function HomePage() {
         const res = await fetch(`/api/posts?${params}`);
         const data = await res.json();
         if (data.posts) {
-          setPosts((prev) => (append ? [...prev, ...data.posts] : data.posts));
+          setPosts((prev) => append ? [...prev, ...data.posts] : data.posts);
           setTotal(data.total);
+          if (p === 1 && !search) {
+            setCache("public_posts", { posts: data.posts, total: data.total });
+          }
         }
       } catch {
         // ignore
@@ -78,24 +98,36 @@ export default function HomePage() {
     fetchPosts(1, false);
   }, [fetchPosts]);
 
+  // Prefetch private posts so switching tabs is instant
+  useEffect(() => {
+    if (authenticated && !getCached<unknown>("private_posts")) {
+      fetch("/api/posts?mode=private&sort=desc&page=1&limit=20")
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data?.posts) setCache("private_posts", { posts: data.posts, total: data.total });
+        })
+        .catch(() => {});
+    }
+  }, [authenticated]);
+
   const loadMore = () => {
     const nextPage = page + 1;
     setPage(nextPage);
     fetchPosts(nextPage, true);
   };
 
-  const handleDelete = (id: string) => {
-    setPosts(posts.filter((p) => p.id !== id));
+  const handleDelete = useCallback((id: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id));
     setTotal((t) => t - 1);
     clearCache();
-  };
+  }, []);
 
-  const handlePin = (id: string, pinned: boolean) => {
-    setPosts(posts.map((p) => (p.id === id ? { ...p, pinned } : p)));
+  const handlePin = useCallback((id: string, pinned: boolean) => {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, pinned } : p)));
     clearCache();
-  };
+  }, []);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     const res = await fetch("/api/posts/export");
     if (!res.ok) return;
     const blob = await res.blob();
@@ -105,7 +137,7 @@ export default function HomePage() {
     a.download = `blog-export-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, []);
 
   const hasMore = posts.length < total;
 

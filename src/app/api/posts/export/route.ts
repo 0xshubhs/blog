@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase";
+import { createClient, type Post } from "@/lib/supabase";
 import { isAuthenticated } from "@/lib/auth";
 import { decrypt } from "@/lib/encryption";
 
@@ -14,14 +14,14 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("posts")
-    .select("*")
+    .select("id, title, description, photos, date, created_at, is_private, encrypted_data, tags, pinned")
     .order("date", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 });
   }
 
-  const exported = data.map((post) => {
+  const exported = (data as Post[]).map((post) => {
     if (post.is_private && post.encrypted_data) {
       try {
         const decrypted = JSON.parse(decrypt(post.encrypted_data));

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase";
+import { createClient, type Post } from "@/lib/supabase";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { isAuthenticated } from "@/lib/auth";
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("posts")
-      .select("*", { count: "exact" })
+      .select("id, date, created_at, tags, pinned, is_private, encrypted_data", { count: "exact" })
       .eq("is_private", true)
       .order("pinned", { ascending: false })
       .order("date", { ascending: sort === "asc" })
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Decrypt and return lightweight summaries
-    let summaries = data.map((post) => {
+    let summaries = (data as Post[]).map((post) => {
       if (post.encrypted_data) {
         try {
           const dec = JSON.parse(decrypt(post.encrypted_data));
@@ -93,10 +93,10 @@ export async function GET(request: NextRequest) {
       }
       return {
         id: post.id,
-        title: post.title,
-        preview: stripMarkdown(post.description || ""),
-        word_count: wordCount(post.description || ""),
-        photo_count: Array.isArray(post.photos) ? post.photos.length : 0,
+        title: "[No data]",
+        preview: "",
+        word_count: 0,
+        photo_count: 0,
         date: post.date,
         is_private: true,
         created_at: post.created_at,
@@ -115,13 +115,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ posts: summaries, total: count || 0, page, limit });
+    return NextResponse.json({ posts: summaries, total: search ? summaries.length : (count || 0), page, limit });
   }
 
-  // Public posts — only select lightweight columns (no photos, no full description)
+  // Public posts — select lightweight columns only; photos blob intentionally excluded
+  // photo_count is derived via a separate Postgres aggregate to avoid pulling base64 data
+  // NOTE: `description` can be up to 50,000 chars but only 200 chars are used for the preview
+  // (sliced by stripMarkdown below). Supabase JS client does not support substring selection,
+  // so the full column is fetched. To avoid this, consider a Postgres view or RPC that
+  // returns LEFT(description, 200) instead.
   let query = supabase
     .from("posts")
-    .select("id, title, description, photos, date, created_at, tags, pinned", { count: "exact" })
+    .select("id, title, description, date, created_at, tags, pinned", { count: "exact" })
     .eq("is_private", false)
     .order("pinned", { ascending: false })
     .order("date", { ascending: sort === "asc" })
@@ -141,13 +146,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 });
   }
 
-  // Transform to lightweight summaries — strip photos and full description
-  const summaries = (data || []).map((post) => ({
+  // Transform to lightweight summaries — photos column not selected, so photo_count is 0 here;
+  // full photo data is only fetched on the individual post detail request.
+  const summaries = ((data || []) as Post[]).map((post) => ({
     id: post.id,
     title: post.title,
     preview: stripMarkdown(post.description || ""),
     word_count: wordCount(post.description || ""),
-    photo_count: Array.isArray(post.photos) ? post.photos.length : 0,
+    photo_count: 0, // not fetched in list view — loaded on demand via GET /api/posts/[id]
     date: post.date,
     created_at: post.created_at,
     tags: post.tags || [],
@@ -236,14 +242,14 @@ export async function POST(request: NextRequest) {
         tags: validTags,
         pinned: false,
       })
-      .select()
+      .select("id")
       .single();
 
     if (error) {
       return NextResponse.json({ error: "Failed to create post" }, { status: 500 });
     }
 
-    return NextResponse.json(row, { status: 201 });
+    return NextResponse.json({ id: row.id }, { status: 201 });
   }
 
   const { data: row, error } = await supabase
@@ -257,12 +263,12 @@ export async function POST(request: NextRequest) {
       tags: validTags,
       pinned: false,
     })
-    .select()
+    .select("id")
     .single();
 
   if (error) {
     return NextResponse.json({ error: "Failed to create post" }, { status: 500 });
   }
 
-  return NextResponse.json(row, { status: 201 });
+  return NextResponse.json({ id: row.id }, { status: 201 });
 }

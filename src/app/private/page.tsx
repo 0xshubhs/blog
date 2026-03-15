@@ -5,7 +5,7 @@ import PostCard from "@/components/PostCard";
 import SearchBar from "@/components/SearchBar";
 import PostStats from "@/components/PostStats";
 import WalletConnect from "@/components/WalletConnect";
-import { clearCache } from "@/lib/cache";
+import { getCached, setCache, clearCache } from "@/lib/cache";
 
 interface PostSummary {
   id: string;
@@ -20,32 +20,38 @@ interface PostSummary {
   pinned?: boolean;
 }
 
+function getInitialPrivateData() {
+  const cached = getCached<{ posts: PostSummary[]; total: number }>("private_posts");
+  return { posts: cached?.posts || [], total: cached?.total || 0, hasCached: cached !== null };
+}
+
 export default function PrivatePage() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [initial] = useState(getInitialPrivateData);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [posts, setPosts] = useState<PostSummary[]>(initial.posts);
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<"desc" | "asc">("desc");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState(initial.total);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/auth/check")
-      .then((r) => r.json())
-      .then((d) => {
-        setAuthenticated(d.authenticated);
-        setChecking(false);
-      })
-      .catch(() => setChecking(false));
-  }, []);
-
+  // Skip separate auth check — just try fetching posts directly, handle 401 inline
   const fetchPosts = useCallback(
     async (p: number, append: boolean) => {
-      if (!authenticated) return;
-      if (p === 1) setLoading(true);
-      else setLoadingMore(true);
+      if (p === 1 && !search) {
+        const cached = getCached<{ posts: PostSummary[]; total: number }>("private_posts");
+        if (cached) {
+          setPosts(cached.posts);
+          setTotal(cached.total);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const hasCached = getCached<{ posts: PostSummary[]; total: number }>("private_posts") !== null;
+      if (p === 1 && !hasCached) setLoading(true);
+      else if (p > 1) setLoadingMore(true);
 
       const params = new URLSearchParams({
         mode: "private",
@@ -57,10 +63,20 @@ export default function PrivatePage() {
 
       try {
         const res = await fetch(`/api/posts?${params}`);
+        if (res.status === 401) {
+          setAuthenticated(false);
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
         const data = await res.json();
         if (data.posts) {
-          setPosts((prev) => (append ? [...prev, ...data.posts] : data.posts));
+          setPosts((prev) => append ? [...prev, ...data.posts] : data.posts);
           setTotal(data.total);
+          setAuthenticated(true);
+          if (p === 1 && !search) {
+            setCache("private_posts", { posts: data.posts, total: data.total });
+          }
         }
       } catch {
         // ignore
@@ -68,7 +84,7 @@ export default function PrivatePage() {
       setLoading(false);
       setLoadingMore(false);
     },
-    [authenticated, sort, search]
+    [sort, search]
   );
 
   useEffect(() => {
@@ -82,25 +98,25 @@ export default function PrivatePage() {
     fetchPosts(nextPage, true);
   };
 
-  const handleDelete = (id: string) => {
-    setPosts(posts.filter((p) => p.id !== id));
+  const handleDelete = useCallback((id: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id));
     setTotal((t) => t - 1);
     clearCache();
-  };
+  }, []);
 
-  const handlePin = (id: string, pinned: boolean) => {
-    setPosts(posts.map((p) => (p.id === id ? { ...p, pinned } : p)));
+  const handlePin = useCallback((id: string, pinned: boolean) => {
+    setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, pinned } : p)));
     clearCache();
-  };
+  }, []);
 
-  if (checking) {
+  if (authenticated === null && posts.length === 0) {
     return (
-      <p className="text-sm text-neutral-400 py-20 text-center">checking auth...</p>
+      <p className="text-sm text-neutral-400 py-20 text-center">loading...</p>
     );
   }
 
-  if (!authenticated) {
-    return <WalletConnect onAuthenticated={() => setAuthenticated(true)} />;
+  if (authenticated === false) {
+    return <WalletConnect onAuthenticated={() => { setAuthenticated(true); fetchPosts(1, false); }} />;
   }
 
   const hasMore = posts.length < total;
