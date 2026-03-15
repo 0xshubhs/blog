@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+
+function readingTime(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean).length;
+  const mins = Math.max(1, Math.round(words / 200));
+  return `${mins} min read`;
+}
 
 interface Post {
   id: string;
@@ -81,6 +88,9 @@ export default function PostCard({
             <time className="text-xs text-neutral-500 font-mono tabular-nums shrink-0">
               {post.date}
             </time>
+            <span className="text-xs text-neutral-400 font-mono">
+              {readingTime(post.description)}
+            </span>
             {post.pinned && (
               <span className="text-xs text-neutral-500">pinned</span>
             )}
@@ -161,8 +171,17 @@ export default function PostCard({
             </div>
           )}
 
+          <div className="mt-4 flex items-center gap-2">
+            <Link
+              href={`/post/${post.id}`}
+              className="text-xs px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              permalink
+            </Link>
+          </div>
+
           {canDelete && (
-            <div className="mt-4 flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2">
               <button
                 onClick={handleEdit}
                 className="text-xs px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"

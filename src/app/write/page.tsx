@@ -26,6 +26,40 @@ export default function WritePage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  const [draftSaved, setDraftSaved] = useState(false);
+
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem("blog_draft");
+      if (draft) {
+        const d = JSON.parse(draft);
+        if (d.title) setTitle(d.title);
+        if (d.description) setDescription(d.description);
+        if (d.date) setDate(d.date);
+        if (d.tags) setTags(d.tags);
+        if (d.isPrivate !== undefined) setIsPrivate(d.isPrivate);
+        // Don't restore photos — too large for localStorage
+      }
+    } catch {
+      // ignore corrupt draft
+    }
+  }, []);
+
+  // Auto-save draft every 3 seconds when content changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (title || description) {
+        localStorage.setItem(
+          "blog_draft",
+          JSON.stringify({ title, description, date, tags, isPrivate })
+        );
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 1500);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [title, description, date, tags, isPrivate]);
 
   useEffect(() => {
     fetch("/api/auth/check")
@@ -68,7 +102,8 @@ export default function WritePage() {
         return;
       }
 
-      // Clear relevant cache so listing pages fetch fresh data
+      // Clear draft and cache
+      localStorage.removeItem("blog_draft");
       clearCache();
       router.push(isPrivate ? "/private" : "/");
     } catch {
@@ -154,6 +189,10 @@ export default function WritePage() {
 
         {error && (
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
+
+        {draftSaved && (
+          <p className="text-xs text-neutral-400 font-mono">draft saved</p>
         )}
 
         <button
