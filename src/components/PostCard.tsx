@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
+import dynamic from "next/dynamic";
+
+const ReactMarkdown = dynamic(() => import("react-markdown"), { ssr: false });
 
 function readingTime(words: number): string {
   const mins = Math.max(1, Math.round(words / 200));
@@ -30,7 +32,7 @@ interface FullPost {
   photos: { data: string; name: string }[];
 }
 
-export default function PostCard({
+const PostCard = memo(function PostCard({
   post,
   onDelete,
   onPin,
@@ -173,6 +175,8 @@ export default function PostCard({
                       src={fullPost.photos[photoIndex].data}
                       alt={fullPost.photos[photoIndex].name}
                       className="w-full max-h-[500px] object-contain bg-neutral-50 dark:bg-neutral-900"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
                   {fullPost.photos.length > 1 && (
@@ -241,4 +245,6 @@ export default function PostCard({
       )}
     </article>
   );
-}
+});
+
+export default PostCard;

@@ -45,7 +45,7 @@ contract BlogRegistryTest is Test {
             bool isPrivate,
             bool pinned,
             bool deleted,
-            uint256 createdAt,
+            uint48 createdAt,
             ,
             string[] memory postTags
         ) = blog.getPost(0);
@@ -130,7 +130,7 @@ contract BlogRegistryTest is Test {
         vm.warp(block.timestamp + 100);
         blog.editPost(0, "Test2", "QmCID2", false, tags);
 
-        (, , , , , uint256 createdAt, uint256 updatedAt, ) = blog.getPost(0);
+        (, , , , , uint48 createdAt, uint48 updatedAt, ) = blog.getPost(0);
         assertGt(updatedAt, createdAt);
     }
 
@@ -292,5 +292,114 @@ contract BlogRegistryTest is Test {
         assertEq(id1, 1);
         assertEq(id2, 2);
         assertEq(blog.getPostCount(), 3);
+    }
+
+    // ─── Fuzz Tests ──────────────────────────────────────────────────────
+
+    function testFuzz_CreatePost(string calldata title, string calldata cid) public {
+        vm.assume(bytes(title).length > 0 && bytes(title).length < 500);
+        vm.assume(bytes(cid).length > 0 && bytes(cid).length < 200);
+        string[] memory tags = new string[](0);
+        uint256 id = blog.createPost(title, cid, false, tags);
+        assertEq(id, 0);
+        (string memory t, string memory c,,,,,,) = blog.getPost(0);
+        assertEq(t, title);
+        assertEq(c, cid);
+    }
+
+    function testFuzz_TagLimit(uint8 tagCount) public {
+        tagCount = uint8(bound(tagCount, 0, 20));
+        string[] memory tags = new string[](tagCount);
+        for (uint256 i = 0; i < tagCount; i++) {
+            tags[i] = "t";
+        }
+        if (tagCount > 10) {
+            vm.expectRevert(BlogRegistry.TooManyTags.selector);
+        }
+        blog.createPost("Title", "QmCID", false, tags);
+    }
+
+    function testFuzz_GetPostsPagination(uint256 offset, uint256 limit) public {
+        string[] memory tags = new string[](0);
+        for (uint256 i = 0; i < 5; i++) {
+            blog.createPost("Post", "QmCID", false, tags);
+        }
+        offset = bound(offset, 0, 100);
+        limit = bound(limit, 1, 50);
+        (uint256[] memory ids,,,,,) = blog.getPosts(offset, limit);
+        if (offset >= 5) {
+            assertEq(ids.length, 0);
+        } else {
+            uint256 expected = offset + limit > 5 ? 5 - offset : limit;
+            assertEq(ids.length, expected);
+        }
+    }
+
+    function testFuzz_UnauthorizedCreate(address caller) public {
+        vm.assume(caller != address(this));
+        string[] memory tags = new string[](0);
+        vm.prank(caller);
+        vm.expectRevert(BlogRegistry.NotAuthorized.selector);
+        blog.createPost("Title", "QmCID", false, tags);
+    }
+
+    // ─── Edge Case Tests ─────────────────────────────────────────────────
+
+    function test_CreatePostMaxTags() public {
+        string[] memory tags = new string[](10);
+        for (uint256 i = 0; i < 10; i++) tags[i] = "tag";
+        uint256 id = blog.createPost("Title", "QmCID", false, tags);
+        string[] memory t = blog.getPostTags(id);
+        assertEq(t.length, 10);
+    }
+
+    function test_RevertGetPostAtLength() public {
+        string[] memory tags = new string[](0);
+        blog.createPost("A", "QmA", false, tags);
+        vm.expectRevert(BlogRegistry.PostNotFound.selector);
+        blog.getPost(1);
+    }
+
+    function test_EditPreservesCreatedAt() public {
+        string[] memory tags = new string[](0);
+        blog.createPost("A", "QmA", false, tags);
+        (,,,,, uint48 created1,,) = blog.getPost(0);
+        vm.warp(block.timestamp + 1000);
+        blog.editPost(0, "B", "QmB", false, tags);
+        (,,,,, uint48 created2, uint48 updated2,) = blog.getPost(0);
+        assertEq(created1, created2);
+        assertGt(updated2, created2);
+    }
+
+    function test_ReaddWriter() public {
+        blog.addWriter(writer);
+        blog.removeWriter(writer);
+        blog.addWriter(writer);
+        assertTrue(blog.writers(writer));
+        string[] memory tags = new string[](0);
+        vm.prank(writer);
+        blog.createPost("OK", "QmOK", false, tags);
+    }
+
+    function test_TransferOwnershipOldOwnerStillWriter() public {
+        blog.transferOwnership(writer);
+        assertEq(blog.owner(), writer);
+        assertTrue(blog.writers(address(this)));
+    }
+
+    // ─── Security Tests ──────────────────────────────────────────────────
+
+    function testFuzz_OnlyOwnerTransfers(address caller) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(BlogRegistry.NotOwner.selector);
+        blog.transferOwnership(caller);
+    }
+
+    function testFuzz_OnlyOwnerManagesWriters(address caller) public {
+        vm.assume(caller != address(this));
+        vm.prank(caller);
+        vm.expectRevert(BlogRegistry.NotOwner.selector);
+        blog.addWriter(address(0x99));
     }
 }

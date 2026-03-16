@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
@@ -7,17 +7,25 @@ import Web3Provider from "@/components/Web3Provider";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://0xshubhs.com";
 const siteName = "0xshubhs-blogs";
 const siteDescription =
   "thoughts, builds, and notes from a web3 builder. on-chain identity, decentralized systems, and everything in between.";
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -94,8 +102,7 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/m.gif" type="image/gif" />
         <link rel="apple-touch-icon" href="/m.gif" />
-        <meta name="theme-color" content="#0a0a0a" />
-        <script
+<script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark');document.documentElement.setAttribute('data-theme','dark')}if(t==='light'){document.documentElement.setAttribute('data-theme','light')}}catch(e){}})()`,
           }}

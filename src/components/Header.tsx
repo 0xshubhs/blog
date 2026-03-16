@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDisconnect } from "wagmi";
 import { clearCache, getCached, setCache } from "@/lib/cache";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -28,14 +28,14 @@ export default function Header() {
       .catch(() => {});
   }, []);
 
-  const handleDisconnect = async () => {
+  const handleDisconnect = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     disconnect();
     setAuthenticated(false);
     clearCache();
     router.push("/");
     router.refresh();
-  };
+  }, [disconnect, router]);
 
   // Keyboard shortcut: Ctrl+Shift+L to disconnect
   useEffect(() => {
@@ -47,13 +47,13 @@ export default function Header() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  });
+  }, [authenticated, handleDisconnect]);
 
   return (
     <header>
       <div className="max-w-3xl mx-auto px-6 pt-8 pb-4 flex flex-col items-center gap-2">
-        <Link href="/" className="flex flex-col items-center gap-2 hover:opacity-70 transition-opacity">
-          <img src="/m.gif" alt="" className="w-14 h-14 rounded-full" />
+        <Link href="/" aria-label="Go to home" className="flex flex-col items-center gap-2 hover:opacity-70 transition-opacity">
+          <img src="/m.gif" alt="" width={56} height={56} className="w-14 h-14 rounded-full" />
           <span className="text-xl tracking-tight font-medium">0xshubhs-blogs</span>
         </Link>
       </div>

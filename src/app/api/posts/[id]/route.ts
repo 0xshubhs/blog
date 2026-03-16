@@ -41,11 +41,15 @@ export async function GET(
       try {
         const decryptedData = JSON.parse(decrypt(data.encrypted_data));
         return NextResponse.json({
-          ...data,
+          id: data.id,
           title: decryptedData.title,
           description: decryptedData.description,
           photos: decryptedData.photos,
-          encrypted_data: undefined,
+          date: data.date,
+          created_at: data.created_at,
+          is_private: data.is_private,
+          tags: data.tags,
+          pinned: data.pinned,
         });
       } catch {
         return NextResponse.json({ error: "Failed to load post" }, { status: 500 });
@@ -53,7 +57,11 @@ export async function GET(
     }
   }
 
-  return NextResponse.json(data);
+  // Strip encrypted_data before returning public post
+  const { encrypted_data: _enc, ...publicData } = data;
+  const res = NextResponse.json(publicData);
+  res.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
+  return res;
 }
 
 export async function PATCH(
